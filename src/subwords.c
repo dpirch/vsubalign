@@ -16,21 +16,21 @@ subnodelist_t *subnodelist_create(dict_t *dict)
 
     subnodelist_t *wl = xmalloc(sizeof *wl);
     *wl = (subnodelist_t){
-        .alloc = fixed_alloc_create(sizeof (subnode_t), 256)
+        .alloc = fixed_allocator_create(sizeof (subnode_t), 256)
     };
     return wl;
 }
 
 void subnodelist_delete(subnodelist_t *wl)
 {
-    fixed_alloc_delete(wl->alloc);
+    fixed_allocator_delete(wl->alloc);
     free(wl);
 }
 
 void subnodelist_add(subnodelist_t *wl, dictword_t *word,
         unsigned minstarttime, unsigned maxendtime)
 {
-    struct subnode *sw = alloc_fixed(wl->alloc);
+    struct subnode *sw = fixed_alloc(wl->alloc);
     *sw = (struct subnode) {
         .word = word,
         .word_next = word->subnodes,

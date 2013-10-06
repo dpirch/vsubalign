@@ -24,7 +24,7 @@ static bool matchword(const void *item, const void *key)
 static void *createword(const void *key, void *userptr)
 {
     size_t len = strlen(key);
-    dictword_t *word = alloc_var(sizeof (dictword_t) + len + 1,
+    dictword_t *word = var_alloc(sizeof (dictword_t) + len + 1,
             alignof (dictword_t), userptr);
     memcpy(word->string, key, len + 1);
     return word;
@@ -34,7 +34,7 @@ static void *createword(const void *key, void *userptr)
 dict_t *dict_create(void)
 {
     dict_t *dict = xmalloc(sizeof *dict);
-    dict->wordalloc = var_alloc_create(16384);
+    dict->wordalloc = var_allocator_create(16384);
     dict->words = hashtable_create(offsetof(dictword_t, hashval));
     return dict;
 }
@@ -42,7 +42,7 @@ dict_t *dict_create(void)
 void dict_delete(dict_t *dict)
 {
     hashtable_delete(dict->words);
-    var_alloc_delete(dict->wordalloc);
+    var_allocator_delete(dict->wordalloc);
 }
 
 dictword_t *dict_lookup(const dict_t *dict, const char *str)

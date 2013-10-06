@@ -5,7 +5,7 @@
 
 typedef struct dict {
     struct hashtable *words;
-    struct var_alloc *wordalloc;
+    struct var_allocator *wordalloc;
 } dict_t;
 
 typedef struct dictword {

@@ -32,7 +32,7 @@ struct ngramkey {
 
 struct lmbuilder_t {
     hashtable_t *ngrams[N];
-    fixed_alloc_t *ngramalloc;
+    fixed_allocator_t *ngramalloc;
     struct ngram *state[N-1];        // last unigram .. (N-1)-gram
     unsigned unisum;                 // sum of counts of all unigrams
     bool sentence_started;
@@ -61,7 +61,7 @@ static bool match_ngram(const void *item, const void *key)
 static void *create_ngram(const void *key, void *userptr)
 {
     const struct ngramkey *ngramkey = key;
-    struct ngram *ngram = alloc_fixed(userptr);
+    struct ngram *ngram = fixed_alloc(userptr);
     *ngram = (struct ngram) { .base = ngramkey->base, .word = ngramkey->word };
     return ngram;
 }
@@ -71,7 +71,7 @@ lmbuilder_t *lmbuilder_create(dict_t *dict)
 {
     lmbuilder_t *lmb = xmalloc(sizeof *lmb);
     *lmb = (lmbuilder_t) {
-        .ngramalloc = fixed_alloc_create(sizeof (struct ngram), 256),
+        .ngramalloc = fixed_allocator_create(sizeof (struct ngram), 256),
         .sentence_start_word = dict_lookup_or_add(dict, "<s>"),
         .sentence_end_word = dict_lookup_or_add(dict, "</s>"),
         .unknown_word = dict_lookup_or_add(dict, "<UNK>")
@@ -87,7 +87,7 @@ void lmbuilder_delete(lmbuilder_t *lmb)
 {
     for (int i = 0; i < N; i++)
         hashtable_delete(lmb->ngrams[i]);
-    fixed_alloc_delete(lmb->ngramalloc);
+    fixed_allocator_delete(lmb->ngramalloc);
     free(lmb);
 }
 

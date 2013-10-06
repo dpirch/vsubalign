@@ -17,7 +17,7 @@ typedef struct subnode {
 } subnode_t;
 
 typedef struct subnodelist {
-    struct fixed_alloc *alloc;
+    struct fixed_allocator *alloc;
     struct subnode *first, *last;
 } subnodelist_t;
 
