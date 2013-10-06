@@ -39,10 +39,11 @@ static void blank_brackets(char *str, char open, char close)
 static void process_wordstring(char *str, const struct cuetime *cuetime,
         subnodelist_t *wl, const dict_t *dict)
 {
-    do {
+    for (;;) {
         dictword_t *word = dict_lookup(dict, str);
         if (word) {
             subnodelist_add(wl, word, cuetime->start, cuetime->end);
+            break;
         } else {
             char *hyphen = strchr(str, '-');
             if (hyphen) {
@@ -53,8 +54,9 @@ static void process_wordstring(char *str, const struct cuetime *cuetime,
                 continue;
             }
             subnodelist_add(wl, NULL, cuetime->start, cuetime->end);
+            break;
         }
-    } while (false);
+    }
 }
 
 
