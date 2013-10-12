@@ -3,25 +3,44 @@
 
 #include "common.h"
 
-struct matchnode {
+struct pathnode {
     struct subnode *subnode;
-    struct matchnode *pred;
+    struct pathnode *pred;
     unsigned time;
-    // todo: scores...
     unsigned refcount;
 };
 
-struct matchstore {
-    struct pool_allocator *alloc;
+
+struct pathtreenode {
+    bool isleaf;
+    unsigned score; // max score for inner node
+    unsigned refcount;
+
+    union {
+        struct pathnode *path;
+        struct { struct pathtreenode *left, *right; };
+    };
 };
 
-struct matchstore *matchstore_create(void);
+
+struct pathstore {
+    struct pool_allocator *path_alloc;
+    struct pool_allocator *pathtree_alloc;
+    unsigned rootlevel;
+};
+
+/*struct matchstore *matchstore_create(void);
 void matchstore_delete(struct matchstore *store);
 
 struct matchnode *matchnode_create(unsigned time, struct subnode *subnode,
-        struct matchnode *pred, struct matchstore *store);
+        struct matchnode *pred, struct matchstore *store);*/
 
-void matchnode_unref(struct matchnode *node, struct matchstore *store);
+void path_unref(struct pathnode *end, struct pathstore *store);
+
+void pathtree_unref(struct pathtreenode *root, struct pathstore *store);
+
+struct pathnode *path_lookup(unsigned maxpos, struct pathtreenode *root,
+        unsigned rootlevel, unsigned rootoffset);
 
 
 #endif /* MATCH_H_ */

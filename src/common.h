@@ -31,7 +31,9 @@ void *grow_array(void *restrict ptr, size_t membsize,
         size_t *restrict capacity, size_t mincapacity);
 
 
-typedef unsigned long hashval_t;
+typedef uint32_t hashval_t;
+typedef uint32_t timestamp_t; // value in milliseconds
+
 
 typedef struct hashnode {
     struct hashnode *next;
