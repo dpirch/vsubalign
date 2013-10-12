@@ -1,11 +1,12 @@
 #ifndef SUBTITLE_H_
 #define SUBTITLE_H_
 
-#include "subwords.h"
-#include "dict.h"
+#include "common.h"
+struct dict;
+struct swnodelist;
 
 bool subtitle_readwords(const char *filename,
-        subnodelist_t *wl, const dict_t *dict);
+        struct swnodelist *wl, const struct dict *dict);
 
 
 /*typedef struct { unsigned start, end; } subtitle_cuetime_t;

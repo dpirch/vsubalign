@@ -10,28 +10,28 @@ static void reset_word_subnodes(void *item, void *userptr)
     (void)userptr;
 }
 
-subnodelist_t *subnodelist_create(dict_t *dict)
+struct swnodelist *swnodelist_create(dict_t *dict)
 {
     hashtable_foreach(dict->words, reset_word_subnodes, NULL, NULL);
 
-    subnodelist_t *wl = xmalloc(sizeof *wl);
-    *wl = (subnodelist_t){
-        .alloc = fixed_allocator_create(sizeof (subnode_t), 256)
+    struct swnodelist *wl = xmalloc(sizeof *wl);
+    *wl = (struct swnodelist){
+        .alloc = fixed_allocator_create(sizeof (struct swnode), 256)
     };
     return wl;
 }
 
-void subnodelist_delete(subnodelist_t *wl)
+void swnodelist_delete(struct swnodelist *wl)
 {
     fixed_allocator_delete(wl->alloc);
     free(wl);
 }
 
-void subnodelist_add(subnodelist_t *wl, dictword_t *word,
+void swnodelist_add(struct swnodelist *wl, dictword_t *word,
         unsigned minstarttime, unsigned maxendtime)
 {
-    struct subnode *sw = fixed_alloc(wl->alloc);
-    *sw = (struct subnode) {
+    struct swnode *sw = fixed_alloc(wl->alloc);
+    *sw = (struct swnode) {
         .word = word,
         .word_next = word->subnodes,
         .minstarttime = minstarttime,

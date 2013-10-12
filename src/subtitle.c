@@ -2,6 +2,8 @@
 
 #include "alloc.h"
 #include "text.h"
+#include "dict.h"
+#include "subwords.h"
 
 struct cuetime { unsigned start, end; };
 
@@ -37,23 +39,23 @@ static void blank_brackets(char *str, char open, char close)
 }
 
 static void process_wordstring(char *str, const struct cuetime *cuetime,
-        subnodelist_t *wl, const dict_t *dict)
+        struct swnodelist *wl, const struct dict *dict)
 {
     for (;;) {
-        dictword_t *word = dict_lookup(dict, str);
+        struct dictword *word = dict_lookup(dict, str);
         if (word) {
-            subnodelist_add(wl, word, cuetime->start, cuetime->end);
+            swnodelist_add(wl, word, cuetime->start, cuetime->end);
             break;
         } else {
             char *hyphen = strchr(str, '-');
             if (hyphen) {
                 *hyphen = '\0';
                 word = dict_lookup(dict, str); // possibly NULL
-                subnodelist_add(wl, word, cuetime->start, cuetime->end);
+                swnodelist_add(wl, word, cuetime->start, cuetime->end);
                 str = hyphen + 1;
                 continue;
             }
-            subnodelist_add(wl, NULL, cuetime->start, cuetime->end);
+            swnodelist_add(wl, NULL, cuetime->start, cuetime->end);
             break;
         }
     }
@@ -61,7 +63,7 @@ static void process_wordstring(char *str, const struct cuetime *cuetime,
 
 
 static void process_line(char *line, const struct cuetime *cuetime,
-        subnodelist_t *wl, const dict_t *dict)
+        struct swnodelist *wl, const struct dict *dict)
 {
     // remove html tags and brackets with text for hearing impaired
     blank_brackets(line, '<', '>');
@@ -99,7 +101,7 @@ static void process_line(char *line, const struct cuetime *cuetime,
 }
 
 bool subtitle_readwords(const char *filename,
-        subnodelist_t *wl, const dict_t *dict)
+        struct swnodelist *wl, const struct dict *dict)
 {
     linereader_t *lr = linereader_open(filename);
     if (!lr) return false;
@@ -130,7 +132,7 @@ bool subtitle_readwords(const char *filename,
 
 
 struct subword *read_subtitle_words(const char *filename,
-        dict_t *stdict, const dict_t *srcdict, fixed_alloc_t *stwalloc)
+        struct dict *stdict, const struct dict *srcdict, fixed_alloc_t *stwalloc)
 {
     textreader_t *tr = textreader_open(filename);
     if (!tr) return NULL;
@@ -154,7 +156,7 @@ struct subword *read_subtitle_words(const char *filename,
 }
 
 void subtitle_wordlist_init(subtitle_wordlist_t *list,
-        linereader_t *lr, dict_t *dict)
+        linereader_t *lr, struct dict *dict)
 {
     *list = (subtitle_wordlist_t){0};
     fixed_alloc_init(&list->allocator, sizeof *list->head, 256);

@@ -4,7 +4,7 @@
 #include "common.h"
 
 struct pathnode {
-    struct subnode *subnode;
+    struct swnode *swnode;
     struct pathnode *pred;
     timestamp_t time;
     unsigned refcount;

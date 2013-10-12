@@ -143,9 +143,9 @@ void lmbuilder_break(lmbuilder_t *lmb)
 }
 
 
-void lmbuilder_add_subnodes(lmbuilder_t *lmb, const struct subnodelist *list)
+void lmbuilder_add_subnodes(lmbuilder_t *lmb, const struct swnodelist *list)
 {
-    FOREACH(subnode_t, node, list->first, seq_next) {
+    FOREACH(struct swnode, node, list->first, seq_next) {
         lmbuilder_addword(lmb, node->word);
         if (!node->seq_next ||
                 node->maxendtime + 200 < node->seq_next->minstarttime)

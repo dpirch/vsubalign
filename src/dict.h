@@ -10,7 +10,7 @@ typedef struct dict {
 
 typedef struct dictword {
     hashval_t hashval;
-    struct subnode *subnodes;
+    struct swnode *subnodes;
     char string[];
 } dictword_t;
 

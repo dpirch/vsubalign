@@ -7,26 +7,26 @@ struct dict;
 struct dictword;
 
 
-typedef struct subnode {
-    struct subnode *seq_next;
-    struct subnode *word_next;
+struct swnode {
+    struct swnode *seq_next;
+    struct swnode *word_next;
     struct dictword *word;
     unsigned seqnum;
     unsigned minstarttime;
     unsigned maxendtime;
-} subnode_t;
+};
 
-typedef struct subnodelist {
+struct swnodelist {
     struct fixed_allocator *alloc;
-    struct subnode *first, *last;
-} subnodelist_t;
+    struct swnode *first, *last;
+};
 
 
-subnodelist_t *subnodelist_create(struct dict *dict);
+struct swnodelist *swnodelist_create(struct dict *dict);
 
-void subnodelist_delete(subnodelist_t *wl);
+void swnodelist_delete(struct swnodelist *wl);
 
-void subnodelist_add(subnodelist_t *wl, struct dictword *word,
+void swnodelist_add(struct swnodelist *wl, struct dictword *word,
         unsigned minstarttime, unsigned maxendtime);
 
 
