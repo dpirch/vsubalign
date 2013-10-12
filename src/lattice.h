@@ -8,7 +8,7 @@ struct dict;
 
 struct latnode {
     struct dictword *word;
-    unsigned time;
+    timestamp_t time;
     struct latlink *out_head;
 
     // for generation

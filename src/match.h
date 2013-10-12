@@ -6,7 +6,7 @@
 struct pathnode {
     struct subnode *subnode;
     struct pathnode *pred;
-    unsigned time;
+    timestamp_t time;
     unsigned refcount;
 };
 
