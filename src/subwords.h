@@ -11,22 +11,23 @@ struct swnode {
     struct swnode *seq_next;
     struct swnode *word_next;
     struct dictword *word;
-    unsigned seqnum;
+    unsigned position;
     unsigned minstarttime;
     unsigned maxendtime;
 };
 
-struct swnodelist {
+struct swlist {
     struct fixed_allocator *alloc;
     struct swnode *first, *last;
+    unsigned length;
 };
 
 
-struct swnodelist *swnodelist_create(struct dict *dict);
+struct swlist *swlist_create(struct dict *dict);
 
-void swnodelist_delete(struct swnodelist *wl);
+void swlist_delete(struct swlist *wl);
 
-void swnodelist_add(struct swnodelist *wl, struct dictword *word,
+void swlist_append(struct swlist *wl, struct dictword *word,
         unsigned minstarttime, unsigned maxendtime);
 
 

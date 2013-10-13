@@ -3,10 +3,10 @@
 
 #include "common.h"
 struct dict;
-struct swnodelist;
+struct swlist;
 
 bool subtitle_readwords(const char *filename,
-        struct swnodelist *wl, const struct dict *dict);
+        struct swlist *wl, const struct dict *dict);
 
 
 /*typedef struct { unsigned start, end; } subtitle_cuetime_t;

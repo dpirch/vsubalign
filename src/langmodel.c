@@ -143,7 +143,7 @@ void lmbuilder_break(lmbuilder_t *lmb)
 }
 
 
-void lmbuilder_add_subnodes(lmbuilder_t *lmb, const struct swnodelist *list)
+void lmbuilder_add_subnodes(lmbuilder_t *lmb, const struct swlist *list)
 {
     FOREACH(struct swnode, node, list->first, seq_next) {
         lmbuilder_addword(lmb, node->word);

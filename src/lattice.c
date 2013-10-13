@@ -24,20 +24,22 @@ struct createarg {
     ps_lattice_t *pslattice;
     unsigned framerate;
     const struct dict *dict;
-    struct fixed_allocator *node_alloc;
+    struct lattice *lattice;
 };
 
 void *nodecreate(const void *key, void *userptr)
 {
     ps_latnode_t *psnode = (ps_latnode_t*)key;
     const struct createarg *arg = userptr;
-    struct latnode *node = fixed_alloc(arg->node_alloc);
+    struct latnode *node = fixed_alloc(arg->lattice->node_alloc);
     *node = (struct latnode) {
         .word = dict_lookup(
                 arg->dict, ps_latnode_baseword(arg->pslattice, psnode)),
         .time = ps_latnode_times(psnode, NULL, NULL) * 1000 / arg->framerate,
-        .psnode = psnode
+        .psnode = psnode,
+        .next = arg->lattice->nodelist
     };
+    arg->lattice->nodelist = node;
     return node;
 }
 
@@ -46,6 +48,8 @@ struct lattice *lattice_create(
         struct ps_lattice_s *pslattice, unsigned framerate,
         const struct dict *dict)
 {
+    // TODO: nentries
+
     struct lattice *lat = xmalloc(sizeof *lat);
     *lat = (struct lattice){
             .node_alloc = fixed_allocator_create(sizeof (struct latnode), 256),
@@ -55,8 +59,7 @@ struct lattice *lattice_create(
     struct hashtable *nodes =
             hashtable_create(offsetof(struct latnode, hashval));
 
-    struct createarg createarg = {
-            pslattice, framerate, dict, lat->node_alloc };
+    struct createarg createarg = { pslattice, framerate, dict, lat };
 
     for (ps_latnode_iter_t *psnodeit = ps_latnode_iter(pslattice);
             psnodeit; psnodeit = ps_latnode_iter_next(psnodeit))
@@ -66,20 +69,24 @@ struct lattice *lattice_create(
                 nodes, nodehash(psnode), nodematch, psnode,
                 nodecreate, &createarg);
 
-        ps_latlink_iter_t *pslinkit = ps_latnode_entries(psnode);
-        if (!pslinkit) lat->start = node;
+        ps_latlink_iter_t *pslinkit = ps_latnode_exits(psnode);
+
         for (; pslinkit; pslinkit = ps_latlink_iter_next(pslinkit)) {
             ps_latlink_t *pslink = ps_latlink_iter_link(pslinkit);
-            ps_latnode_t *psfrom; ps_latlink_nodes(pslink, &psfrom);
+            ps_latnode_t *psdest = ps_latlink_nodes(pslink, NULL);
             // TODO: int32 ascr; ps_latlink_prob(lattice, link, &ascr); ... ogmath_log_to_ln(logmath, ascr)
 
-            struct latnode *from = hashtable_lookup_or_add(
-                    nodes, nodehash(psfrom), nodematch, psfrom,
+            struct latnode *dest = hashtable_lookup_or_add(
+                    nodes, nodehash(psdest), nodematch, psdest,
                     nodecreate, &createarg);
 
             struct latlink *link = fixed_alloc(lat->link_alloc);
-            *link = (struct latlink) { .to = node, .out_next = from->out_head };
-            from->out_head = link;
+            *link = (struct latlink) {
+                .to = dest,
+                .exits_next = node->exits_head
+            };
+            node->exits_head = link;
+            dest->nentries++;
         }
     }
 

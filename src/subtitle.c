@@ -39,23 +39,23 @@ static void blank_brackets(char *str, char open, char close)
 }
 
 static void process_wordstring(char *str, const struct cuetime *cuetime,
-        struct swnodelist *wl, const struct dict *dict)
+        struct swlist *wl, const struct dict *dict)
 {
     for (;;) {
         struct dictword *word = dict_lookup(dict, str);
         if (word) {
-            swnodelist_add(wl, word, cuetime->start, cuetime->end);
+            swlist_append(wl, word, cuetime->start, cuetime->end);
             break;
         } else {
             char *hyphen = strchr(str, '-');
             if (hyphen) {
                 *hyphen = '\0';
                 word = dict_lookup(dict, str); // possibly NULL
-                swnodelist_add(wl, word, cuetime->start, cuetime->end);
+                swlist_append(wl, word, cuetime->start, cuetime->end);
                 str = hyphen + 1;
                 continue;
             }
-            swnodelist_add(wl, NULL, cuetime->start, cuetime->end);
+            swlist_append(wl, NULL, cuetime->start, cuetime->end);
             break;
         }
     }
@@ -63,7 +63,7 @@ static void process_wordstring(char *str, const struct cuetime *cuetime,
 
 
 static void process_line(char *line, const struct cuetime *cuetime,
-        struct swnodelist *wl, const struct dict *dict)
+        struct swlist *wl, const struct dict *dict)
 {
     // remove html tags and brackets with text for hearing impaired
     blank_brackets(line, '<', '>');
@@ -101,7 +101,7 @@ static void process_line(char *line, const struct cuetime *cuetime,
 }
 
 bool subtitle_readwords(const char *filename,
-        struct swnodelist *wl, const struct dict *dict)
+        struct swlist *wl, const struct dict *dict)
 {
     linereader_t *lr = linereader_open(filename);
     if (!lr) return false;
