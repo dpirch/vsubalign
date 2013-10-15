@@ -19,10 +19,11 @@ struct aln_treenode {
     union {
         struct {
             struct aln_treenode *null; // always NULL for leaf
-            struct aln_pathnode *path; // last node of best path, or NULL
+            struct aln_pathnode *path; // last node of best path, not null
         };
         struct {
-            struct aln_treenode *left, *right;
+            struct aln_treenode *right; // not null
+            struct aln_treenode *left;  // may be null
         };
     };
 };
@@ -31,8 +32,8 @@ struct aln_treenode {
 struct alignment {
     struct pool_allocator *pathalloc;
     struct pool_allocator *treealloc;
-    struct aln_treenode *root;
-    unsigned level;
+    struct aln_treenode *tree;
+    unsigned treewidth;
 };
 
 struct alignment *alignment_create(struct swlist *swl);
