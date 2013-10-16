@@ -3,6 +3,7 @@
 #include "alloc.h"
 #include "subwords.h"
 #include "lattice.h"
+#include "dict.h"
 
 static inline bool isleaf(const struct aln_treenode *n) { return !n->null; }
 
@@ -43,20 +44,6 @@ static void tree_unref(struct aln_treenode *root, struct alignment *al)
 }
 
 
-/*static struct aln_treenode *make_leaf(
-        struct aln_pathnode *path, unsigned score, struct alignment *al)
-{
-    struct aln_treenode *leaf = pool_alloc(al->treealloc);
-    *leaf = (struct aln_treenode) {
-        .minscore = score,
-        .maxscore = score,
-        .refcount = 1,
-        .null = NULL,
-        .path = path_ref(path)
-    };
-    return leaf;
-}*/
-
 static struct aln_treenode *make_tree(
         struct aln_treenode *left, struct aln_treenode *right,
         struct alignment *al)
@@ -70,6 +57,33 @@ static struct aln_treenode *make_tree(
         .right = tree_ref(right)
     };
     return node;
+}
+
+
+static struct aln_treenode *make_leaf(struct aln_treenode *baseleaf,
+        struct swnode *swnode, timestamp_t time, struct alignment *al)
+{
+    // todo
+    unsigned score = baseleaf ? baseleaf->minscore + 1 : 1;
+
+    struct aln_pathnode *path = pool_alloc(al->pathalloc);
+    *path = (struct aln_pathnode) {
+        .swnode = swnode,
+        .pred = baseleaf ? path_ref(baseleaf->path) : NULL,
+        .time = time,
+        .refcount = 1
+    };
+
+    struct aln_treenode *leaf = pool_alloc(al->treealloc);
+    *leaf = (struct aln_treenode) {
+        .minscore = score,
+        .maxscore = score,
+        .refcount = 1,
+        .null = NULL,
+        .path = path
+    };
+
+    return leaf;
 }
 
 
@@ -130,7 +144,7 @@ static void merge_path_partial(struct aln_treenode **tree, unsigned width,
 static void merge_tree(struct aln_treenode **tree,
         struct aln_treenode *other, struct alignment *al)
 {
-    if (!other);
+    if (!other) {}
     else if (!*tree) {
         *tree = tree_ref(other);
     } else if (isleaf(other)) {
@@ -154,6 +168,18 @@ static void merge_tree(struct aln_treenode **tree,
     }
 }
 
+static struct aln_treenode *tree_lookup(
+        struct aln_treenode *tree, unsigned width, unsigned pos)
+{
+    while (tree && !isleaf(tree)) {
+        unsigned splitpos = width / 2;
+        if (pos < splitpos)
+            tree = tree->left;
+        else
+            tree = tree->right, pos -= splitpos;
+    }
+    return tree;
+}
 
 
 struct alignment *alignment_create(struct swlist *swl)
@@ -164,40 +190,24 @@ struct alignment *alignment_create(struct swlist *swl)
         .treealloc = pool_allocator_create(sizeof (struct aln_treenode), 256)
     };
 
-    al->treewidth = 1;
-    while (al->treewidth < swl->length)
-        al->treewidth *= 2;
+    al->width = 1;
+    while (al->width < swl->length)
+        al->width *= 2;
 
     return al;
 }
 
 void alignment_delete(struct alignment *al)
 {
+    // TODO: deallocation/check?
+
     pool_allocator_delete(al->pathalloc);
     pool_allocator_delete(al->treealloc);
     free(al);
 }
 
 
-static struct aln_pathnode *tree_lookup(
-        const struct aln_treenode *root, unsigned level,
-        unsigned maxendpos, unsigned *score)
-{
-    while (root && !isleaf(root)) {
-        unsigned splitpos = 1u << --level;
-        if (maxendpos < splitpos)
-            root = root->left;
-        else
-            root = root->right, maxendpos -= splitpos;
-    }
-    if (root) {
-        *score = root->minscore;
-        return root->path;
-    } else {
-        *score = 0;
-        return NULL;
-    }
-}
+
 
 /*
 static struct aln_pathnode *tree_bestpath(
@@ -216,42 +226,63 @@ static struct aln_pathnode *tree_bestpath(
 void alignment_add_lattice(struct alignment *al, struct lattice *lat)
 {
     // list of lattice nodes with all predecesors already processed
-    struct latnode *readylist = NULL;
+    struct latnode *ready = NULL;
 
+    // init ready list and init pathes for these nodes
     FOREACH(struct latnode, node, lat->nodelist, next) {
         node->pathes = NULL;
         node->nentries_remain = node->nentries;
         if (node->nentries_remain == 0) {
-            node->ready_next = readylist;
-            readylist = node;
-            node->pathes = tree_ref(al->tree);
+            node->ready_next = ready;
+            ready = node;
+            node->pathes = tree_ref(al->pathes);
         }
     }
 
-    while (readylist) {
-        struct latnode *node = readylist;
-        readylist = node->ready_next;
+    // reset al->pathes, will be used to store pathes at end of segment
+    tree_unref(al->pathes, al);
+    al->pathes = NULL;
 
-        // todo: audio scores!
 
-        FOREACH(struct latlink, link, node->exits_head, exits_next) {
-            struct latnode *dest = link->to;
-            tree_merge(dest->pathes, al->level, node->pathes, al);
+    // traverse lattice
+    while (ready) {
+        struct latnode *node = ready;
+        ready = node->ready_next;
 
-            if (--dest->nentries_remain == 0) {
-                dest->ready_next = readylist;
-                readylist = dest;
+        if (!node->exits_head) {
+            merge_tree(&al->pathes, node->pathes, al);
+        }
+        else {
+
+            // todo: audio scores!
+
+            FOREACH(struct latlink, link, node->exits_head, exits_next) {
+                struct latnode *dest = link->to;
+                merge_tree(&dest->pathes, node->pathes, al);
+
+                if (--dest->nentries_remain == 0)
+                    dest->ready_next = ready, ready = dest;
+            }
+
+            FOREACH(struct swnode, swnode, node->word->subnodes, word_next) {
+                struct aln_treenode *base = NULL;
+                if (swnode->position > 0)
+                    tree_lookup(node->pathes, al->width, swnode->position - 1);
+
+                struct aln_treenode *newpath = make_leaf(
+                        base, swnode, node->time, al);
+
+                FOREACH(struct latlink, link, node->exits_head, exits_next) {
+                    struct latnode *dest = link->to;
+                    merge_path_partial(&dest->pathes, al->width,
+                            newpath, swnode->position, al);
+                }
+                tree_unref(newpath, al);
             }
         }
 
-        //xxx
-
-
-        //tree_unref(node->pathes);
+        tree_unref(node->pathes, al);
     }
-    // todo: keep pathes of last node
-
-    // what to do with <s> etc.?
 
 }
 

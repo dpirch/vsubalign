@@ -28,12 +28,31 @@ struct aln_treenode {
     };
 };
 
+/*
+struct alnode {
+    unsigned refount;
+    bool ispath;
+
+    union {
+        struct {
+            unsigned minscore, maxscore;
+            struct alnode *left, *right; // left may be null
+        };
+        struct {
+            unsigned score;
+            timestamp_t time;
+            struct swnode *swnode;
+            struct alnode *pred; // path node, or null for beginning of path
+        };
+    };
+};
+*/
 
 struct alignment {
     struct pool_allocator *pathalloc;
     struct pool_allocator *treealloc;
-    struct aln_treenode *tree;
-    unsigned treewidth;
+    struct aln_treenode *pathes;
+    unsigned width;
 };
 
 struct alignment *alignment_create(struct swlist *swl);
