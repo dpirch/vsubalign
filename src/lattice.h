@@ -19,7 +19,7 @@ struct latnode {
             const struct ps_latnode_s *psnode;
         };
         struct { // for alignment
-            struct aln_treenode *pathes;
+            struct alnode *pathes;
             unsigned nentries_remain;
             struct latnode *ready_next;
         };

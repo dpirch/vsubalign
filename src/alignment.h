@@ -5,32 +5,9 @@
 struct swlist;
 struct lattice;
 
-struct aln_pathnode {
-    struct swnode *swnode;
-    struct aln_pathnode *pred;
-    timestamp_t time;
-    unsigned refcount;
-};
 
-
-struct aln_treenode {
-    unsigned minscore, maxscore;
-    unsigned refcount;
-    union {
-        struct {
-            struct aln_treenode *null; // always NULL for leaf
-            struct aln_pathnode *path; // last node of best path, not null
-        };
-        struct {
-            struct aln_treenode *right; // not null
-            struct aln_treenode *left;  // may be null
-        };
-    };
-};
-
-/*
 struct alnode {
-    unsigned refount;
+    unsigned refcount;
     bool ispath;
 
     union {
@@ -46,12 +23,11 @@ struct alnode {
         };
     };
 };
-*/
+
 
 struct alignment {
-    struct pool_allocator *pathalloc;
-    struct pool_allocator *treealloc;
-    struct aln_treenode *pathes;
+    struct pool_allocator *alloc;
+    struct alnode *pathes;
     unsigned width;
 };
 
