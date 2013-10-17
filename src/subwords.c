@@ -33,12 +33,14 @@ void swlist_append(struct swlist *wl, dictword_t *word,
     struct swnode *sw = fixed_alloc(wl->alloc);
     *sw = (struct swnode) {
         .word = word,
-        .word_next = word->subnodes,
         .minstarttime = minstarttime,
         .maxendtime = maxendtime
     };
 
-    word->subnodes = sw;
+    if (word) {
+        sw->word_next = word->subnodes,
+        word->subnodes = sw;
+    }
 
     if (wl->length++) {
         wl->last->seq_next = sw;
