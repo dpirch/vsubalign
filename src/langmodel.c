@@ -12,7 +12,7 @@
 
 struct ngram {
     struct ngram *base;              // (n-1)-gram without last word
-    const dictword_t *word;          // last word
+    const struct dictword *word;          // last word
 
     const struct ngram *back;        // (n-1)-gram without first word
     const struct ngram *baseof_list; // list of (n+1)-grams with this as base
@@ -27,7 +27,7 @@ struct ngram {
 
 struct ngramkey {
     struct ngram *base;
-    const dictword_t *word;
+    const struct dictword *word;
 };
 
 struct lmbuilder_t {
@@ -37,9 +37,9 @@ struct lmbuilder_t {
     unsigned unisum;                 // sum of counts of all unigrams
     bool sentence_started;
 
-    const dictword_t *sentence_start_word;
-    const dictword_t *sentence_end_word;
-    const dictword_t *unknown_word;
+    const struct dictword *sentence_start_word;
+    const struct dictword *sentence_end_word;
+    const struct dictword *unknown_word;
 };
 
 
@@ -67,7 +67,7 @@ static void *create_ngram(const void *key, void *userptr)
 }
 
 
-lmbuilder_t *lmbuilder_create(dict_t *dict)
+lmbuilder_t *lmbuilder_create(struct dict *dict)
 {
     lmbuilder_t *lmb = xmalloc(sizeof *lmb);
     *lmb = (lmbuilder_t) {
@@ -91,7 +91,7 @@ void lmbuilder_delete(lmbuilder_t *lmb)
     free(lmb);
 }
 
-void lmbuilder_addword(lmbuilder_t *lmb, const dictword_t *word)
+void lmbuilder_addword(lmbuilder_t *lmb, const struct dictword *word)
 {
     if (!lmb->sentence_started) {
         lmb->sentence_started = true;

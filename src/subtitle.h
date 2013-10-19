@@ -6,7 +6,7 @@ struct dict;
 struct swlist;
 
 bool subtitle_readwords(const char *filename,
-        struct swlist *wl, const struct dict *dict);
+        struct swlist *wl, struct dict *dict, const struct dict *srcdict);
 
 
 /*typedef struct { unsigned start, end; } subtitle_cuetime_t;

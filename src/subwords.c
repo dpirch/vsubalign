@@ -6,11 +6,11 @@
 
 static void reset_word_subnodes(void *item, void *userptr)
 {
-    ((dictword_t*)item)->subnodes = NULL;
+    ((struct dictword*)item)->subnodes = NULL;
     (void)userptr;
 }
 
-struct swlist *swlist_create(dict_t *dict)
+struct swlist *swlist_create(struct dict *dict)
 {
     hashtable_foreach(dict->words, reset_word_subnodes, NULL, NULL);
 
@@ -27,7 +27,7 @@ void swlist_delete(struct swlist *wl)
     free(wl);
 }
 
-void swlist_append(struct swlist *wl, dictword_t *word,
+void swlist_append(struct swlist *wl, struct dictword *word,
         unsigned minstarttime, unsigned maxendtime)
 {
     struct swnode *sw = fixed_alloc(wl->alloc);

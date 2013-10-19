@@ -3,25 +3,36 @@
 
 #include "common.h"
 
-typedef struct dict {
+struct dict {
     struct hashtable *words;
     struct var_allocator *wordalloc;
-} dict_t;
+    struct var_allocator *pronalloc;
+};
 
-typedef struct dictword {
+struct dictword {
     hashval_t hashval;
     struct swnode *subnodes;
+    struct dictpron *pronlist;
     char string[];
-} dictword_t;
+};
 
-dict_t *dict_create(void);
-void dict_delete(dict_t *dict);
+struct dictpron {
+    struct dictpron *next;
+    char string[];
+};
 
-dictword_t *dict_lookup(const dict_t *dict, const char *str);
-dictword_t *dict_lookup_or_add(dict_t *dict, const char *str);
+struct dict *dict_create(void);
+void dict_delete(struct dict *dict);
 
-bool dict_read(dict_t *dict, const char *filename);
+struct dictword *dict_lookup(const struct dict *dict, const char *str);
+struct dictword *dict_lookup_or_add(struct dict *dict, const char *str);
 
+struct dictword *dict_lookup_or_copy(struct dict *dict, const char *str,
+        const struct dict *srcdict);
+
+bool dict_read(struct dict *dict, const char *filename);
+
+bool dict_write(const struct dict *dict, const char *filename);
 
 
 #endif /* DICT_H_ */

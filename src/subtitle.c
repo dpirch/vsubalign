@@ -39,10 +39,10 @@ static void blank_brackets(char *str, char open, char close)
 }
 
 static void process_wordstring(char *str, const struct cuetime *cuetime,
-        struct swlist *wl, const struct dict *dict)
+        struct swlist *wl, struct dict *dict, const struct dict *srcdict)
 {
     for (;;) {
-        struct dictword *word = dict_lookup(dict, str);
+        struct dictword *word = dict_lookup_or_copy(dict, str, srcdict);
         if (word) {
             swlist_append(wl, word, cuetime->start, cuetime->end);
             break;
@@ -50,7 +50,9 @@ static void process_wordstring(char *str, const struct cuetime *cuetime,
             char *hyphen = strchr(str, '-');
             if (hyphen) {
                 *hyphen = '\0';
-                word = dict_lookup(dict, str); // possibly NULL
+                word = dict_lookup_or_copy(dict, str, srcdict);
+
+                // possibly append NULL
                 swlist_append(wl, word, cuetime->start, cuetime->end);
                 str = hyphen + 1;
                 continue;
@@ -63,7 +65,7 @@ static void process_wordstring(char *str, const struct cuetime *cuetime,
 
 
 static void process_line(char *line, const struct cuetime *cuetime,
-        struct swlist *wl, const struct dict *dict)
+        struct swlist *wl, struct dict *dict, const struct dict *srcdict)
 {
     // remove html tags and brackets with text for hearing impaired
     blank_brackets(line, '<', '>');
@@ -94,14 +96,14 @@ static void process_line(char *line, const struct cuetime *cuetime,
         if (!*p) break;
         char *end = strchr(p, ' ');
         if (end) *end = '\0';
-        process_wordstring(p, cuetime, wl, dict);
+        process_wordstring(p, cuetime, wl, dict, srcdict);
         if (!end) break;
         p = end + 1;
     }
 }
 
 bool subtitle_readwords(const char *filename,
-        struct swlist *wl, const struct dict *dict)
+        struct swlist *wl, struct dict *dict, const struct dict *srcdict)
 {
     linereader_t *lr = linereader_open(filename);
     if (!lr) return false;
@@ -111,7 +113,7 @@ bool subtitle_readwords(const char *filename,
         if (!parse_cuetime(line, &time)) continue;
 
         while (line = linereader_getline(lr), line && *line)
-            process_line(line, &time, wl, dict);
+            process_line(line, &time, wl, dict, srcdict);
     }
 
     bool success = !linereader_error(lr);
