@@ -68,10 +68,13 @@ void *hashtable_lookup_or_add(hashtable_t *ht, hashval_t hashval,
     void **slot = lookup_ptr(ht, hashval, match, key);
     void *item = *slot;
     if (!item) {
-        *slot = item = create(key, userptr);
-        *(hashval_t*)((char*)item + ht->hashval_offset) = hashval;
-        if (++ht->count > ht->tablesize / 2)
-            resize(ht, ht->tablesize * 4);
+        item = create(key, userptr);
+        if (item) {
+            *slot = item;
+            *(hashval_t*)((char*)item + ht->hashval_offset) = hashval;
+            if (++ht->count > ht->tablesize / 2)
+                resize(ht, ht->tablesize * 4);
+        }
     }
     return item;
 }
