@@ -3,23 +3,22 @@
 
 #include "common.h"
 
-struct dict;
 struct dictword;
 struct swlist;
 
-typedef struct lmbuilder_t lmbuilder_t;
+struct lmbuilder;
 
-lmbuilder_t *lmbuilder_create(struct dict *dict);
-void lmbuilder_delete(lmbuilder_t *lmb);
+struct lmbuilder *lmbuilder_create(void);
+void lmbuilder_delete(struct lmbuilder *lmb);
 
-void lmbuilder_addword(lmbuilder_t *lmb, const struct dictword *word);
-void lmbuilder_break(lmbuilder_t *lmb);
+void lmbuilder_addword(struct lmbuilder *lmb, const struct dictword *word);
+void lmbuilder_break(struct lmbuilder *lmb);
 
-void lmbuilder_add_subnodes(lmbuilder_t *lmb, const struct swlist *list);
+void lmbuilder_add_subnodes(struct lmbuilder *lmb, const struct swlist *list);
 
-void lmbuilder_compute_model(const lmbuilder_t *lmb, float discount);
+void lmbuilder_compute_model(const struct lmbuilder *lmb, float discount);
 
-bool lmbuilder_write_model(const lmbuilder_t *lmb, const char *filename);
+bool lmbuilder_write_model(const struct lmbuilder *lmb, const char *filename);
 
 
 

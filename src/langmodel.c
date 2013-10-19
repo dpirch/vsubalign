@@ -30,13 +30,14 @@ struct ngramkey {
     const struct dictword *word;
 };
 
-struct lmbuilder_t {
-    hashtable_t *ngrams[N];
-    fixed_allocator_t *ngramalloc;
+struct lmbuilder {
+    struct hashtable *ngrams[N];
+    struct fixed_allocator *ngramalloc;
     struct ngram *state[N-1];        // last unigram .. (N-1)-gram
     unsigned unisum;                 // sum of counts of all unigrams
     bool sentence_started;
 
+    struct dict *dummydict;
     const struct dictword *sentence_start_word;
     const struct dictword *sentence_end_word;
     const struct dictword *unknown_word;
@@ -67,15 +68,17 @@ static void *create_ngram(const void *key, void *userptr)
 }
 
 
-lmbuilder_t *lmbuilder_create(struct dict *dict)
+struct lmbuilder *lmbuilder_create(void)
 {
-    lmbuilder_t *lmb = xmalloc(sizeof *lmb);
-    *lmb = (lmbuilder_t) {
+    struct lmbuilder *lmb = xmalloc(sizeof *lmb);
+    *lmb = (struct lmbuilder) {
         .ngramalloc = fixed_allocator_create(sizeof (struct ngram), 256),
-        .sentence_start_word = dict_lookup_or_add(dict, "<s>"),
-        .sentence_end_word = dict_lookup_or_add(dict, "</s>"),
-        .unknown_word = dict_lookup_or_add(dict, "<UNK>")
+        .dummydict = dict_create()
     };
+
+    lmb->sentence_start_word = dict_lookup_or_add(lmb->dummydict, "<s>");
+    lmb->sentence_end_word = dict_lookup_or_add(lmb->dummydict, "</s>");
+    lmb->unknown_word = dict_lookup_or_add(lmb->dummydict, "<UNK>");
 
     for (int i = 0; i < N; i++)
         lmb->ngrams[i] = hashtable_create(offsetof(struct ngram, hashval));
@@ -83,15 +86,16 @@ lmbuilder_t *lmbuilder_create(struct dict *dict)
     return lmb;
 }
 
-void lmbuilder_delete(lmbuilder_t *lmb)
+void lmbuilder_delete(struct lmbuilder *lmb)
 {
     for (int i = 0; i < N; i++)
         hashtable_delete(lmb->ngrams[i]);
     fixed_allocator_delete(lmb->ngramalloc);
+    dict_delete(lmb->dummydict);
     free(lmb);
 }
 
-void lmbuilder_addword(lmbuilder_t *lmb, const struct dictword *word)
+void lmbuilder_addword(struct lmbuilder *lmb, const struct dictword *word)
 {
     if (!lmb->sentence_started) {
         lmb->sentence_started = true;
@@ -131,7 +135,7 @@ void lmbuilder_addword(lmbuilder_t *lmb, const struct dictword *word)
     lmb->unisum++;
 }
 
-void lmbuilder_break(lmbuilder_t *lmb)
+void lmbuilder_break(struct lmbuilder *lmb)
 {
     if (lmb->sentence_started) {
         lmbuilder_addword(lmb, lmb->sentence_end_word);
@@ -143,7 +147,7 @@ void lmbuilder_break(lmbuilder_t *lmb)
 }
 
 
-void lmbuilder_add_subnodes(lmbuilder_t *lmb, const struct swlist *list)
+void lmbuilder_add_subnodes(struct lmbuilder *lmb, const struct swlist *list)
 {
     FOREACH(struct swnode, node, list->first, seq_next) {
         lmbuilder_addword(lmb, node->word);
@@ -181,7 +185,7 @@ static void compute_alpha(void *item, void *userptr)
     ngram->alpha = arg->discount / (1.0f - sum_denon);
 }
 
-void lmbuilder_compute_model(const lmbuilder_t *lmb, float discount)
+void lmbuilder_compute_model(const struct lmbuilder *lmb, float discount)
 {
     struct compute_prob_arg probarg = { lmb->unisum, 1.0f - discount };
     for (int i = 0; i < N; i++)
@@ -230,7 +234,7 @@ static int ngram_compar(const void *p1, const void *p2)
     return strcmp(ng1->word->string, ng2->word->string);
 }
 
-bool lmbuilder_write_model(const lmbuilder_t *lmb, const char *filename)
+bool lmbuilder_write_model(const struct lmbuilder *lmb, const char *filename)
 {
     FILE *file = fopen(filename, "w");
     if (!file) {
