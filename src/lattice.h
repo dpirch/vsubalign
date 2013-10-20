@@ -7,7 +7,7 @@ struct ps_lattice_s;
 struct dict;
 
 struct latnode {
-    struct dictword *word;
+    struct dictword *word; // can be NULL, e.g. for <sil>
     timestamp_t time;
     struct latlink *exits_head;
     unsigned nentries;

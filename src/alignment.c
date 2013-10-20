@@ -29,6 +29,7 @@ static void unref(struct alnode *node, struct alignment *al)
     }
 }
 
+
 static struct alnode *make_tree(struct alnode *left, struct alnode *right,
         struct alignment *al)
 {
@@ -156,6 +157,7 @@ static struct alnode *tree_lookup(
             tree = tree->left;
         else
             tree = tree->right, pos -= splitpos;
+        width = splitpos;
     }
     return tree;
 }
@@ -177,28 +179,35 @@ struct alignment *alignment_create(struct swlist *swl)
 
 void alignment_delete(struct alignment *al)
 {
-    // TODO: deallocation/check?
+    unref(al->pathes, al);
 
     pool_allocator_delete(al->alloc);
     free(al);
 }
 
-
-
-
 /*
-static struct aln_pathnode *tree_bestpath(
-        const struct aln_treenode *root, unsigned *score)
+static void dump_path(struct alnode *path)
 {
-    while (xx !isleaf(root))
-        root = root->right;
+    do {
+        printf(" %u.%s",
+                path->swnode->position, path->swnode->word->string);
+        path = path->pred;
+    } while (path);
+    printf("\n");
+}
 
-    *score = root->minscore;
-    return root->path;
-}*/
-
-
-
+static void dump_tree(struct alnode *tree, unsigned width, unsigned pos)
+{
+    if (tree && tree->ispath && pos == tree->swnode->position) {
+        printf("%u:", pos);
+        dump_path(tree);
+    }
+    else if (tree && !tree->ispath) {
+        dump_tree(tree->left, width / 2, pos);
+        dump_tree(tree->right, width / 2, pos + width / 2);
+    }
+}
+*/
 
 void alignment_add_lattice(struct alignment *al, struct lattice *lat)
 {
@@ -220,7 +229,6 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
     unref(al->pathes, al);
     al->pathes = NULL;
 
-
     // traverse lattice
     while (ready) {
         struct latnode *node = ready;
@@ -230,7 +238,6 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
             merge_tree(&al->pathes, node->pathes, al);
         }
         else {
-
             // todo: audio scores!
 
             FOREACH(struct latlink, link, node->exits_head, exits_next) {
@@ -241,20 +248,24 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
                     dest->ready_next = ready, ready = dest;
             }
 
-            FOREACH(struct swnode, swnode, node->word->subnodes, word_next) {
-                struct alnode *base = NULL;
-                if (swnode->position > 0)
-                    tree_lookup(node->pathes, al->width, swnode->position - 1);
+            if (node->word) {
+                FOREACH(struct swnode, swnode, node->word->subnodes, word_next) {
+                    struct alnode *base = NULL;
+                    if (swnode->position > 0)
+                        base = tree_lookup(
+                                node->pathes, al->width, swnode->position - 1);
 
-                struct alnode *newpath = make_path(
-                        base, swnode, node->time, al);
+                    struct alnode *newpath = make_path(
+                            base, swnode, node->time, al);
 
-                FOREACH(struct latlink, link, node->exits_head, exits_next) {
-                    struct latnode *dest = link->to;
-                    merge_path_partial(&dest->pathes, al->width,
-                            newpath, swnode->position, al);
+                    FOREACH(struct latlink, link, node->exits_head, exits_next) {
+                        struct latnode *dest = link->to;
+                        merge_path_partial(&dest->pathes, al->width,
+                                newpath, swnode->position, al);
+
+                    }
+                    unref(newpath, al);
                 }
-                unref(newpath, al);
             }
         }
 
@@ -264,37 +275,15 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
 }
 
 
-
-
-
-/*
-struct matchstore *matchstore_create(void)
+void alignment_dump_final(const struct alignment *al)
 {
-    struct matchstore *store = xmalloc(sizeof *store);
-    store->nodealloc = pool_allocator_create(sizeof (struct matchnode), 1024);
-    return store;
+    struct alnode *path = tree_lookup(al->pathes, al->width, al->width - 1);
+    while (path) {
+        printf("%u:%02u.%02u: %s (%.2f)\n",
+                path->time / 60000, path->time / 1000 % 60, path->time / 10 % 100,
+                path->swnode->word->string,
+                ((double)path->time - path->swnode->minstarttime) / ((double)path->swnode->maxendtime - path->swnode->minstarttime));
+
+        path = path->pred;
+    }
 }
-
-void matchstore_delete(struct matchstore *store)
-{
-    pool_allocator_delete(store->nodealloc);
-    free(store);
-}
-
-
-struct matchnode * matchnode_create(unsigned time, struct subnode *subnode,
-        struct matchnode *pred, struct matchstore *store)
-{
-    struct matchnode *node = pool_alloc(store->nodealloc);
-    *node = (struct matchnode) {
-        .subnode = subnode,
-        .pred = pred,
-        .time = time,
-        .pathlength = pred ? pred->pathlength + 1: 1,
-        .refcount = 1
-    };
-    if (pred) pred->refcount++;
-    return node;
-}
-
-*/

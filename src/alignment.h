@@ -37,6 +37,7 @@ void alignment_delete(struct alignment *al);
 
 void alignment_add_lattice(struct alignment *al, struct lattice *lat);
 
+void alignment_dump_final(const struct alignment *al);
 
 
 
