@@ -85,5 +85,7 @@ void aqueue_close(struct aqueue *q)
 {
     CHECK(!pthread_mutex_lock(&q->mutex));
     q->closed = true;
+    pthread_cond_broadcast(&q->pushwait);
+    pthread_cond_broadcast(&q->popwait);
     pthread_mutex_unlock(&q->mutex);
 }
