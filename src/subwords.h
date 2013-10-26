@@ -3,7 +3,6 @@
 
 #include "common.h"
 
-struct dict;
 struct dictword;
 
 
@@ -23,7 +22,7 @@ struct swlist {
 };
 
 
-struct swlist *swlist_create(struct dict *dict);
+struct swlist *swlist_create(void);
 
 void swlist_delete(struct swlist *wl);
 

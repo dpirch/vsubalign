@@ -4,16 +4,9 @@
 #include "dict.h"
 #include "hashtable.h"
 
-static void reset_word_subnodes(void *item, void *userptr)
-{
-    ((struct dictword*)item)->subnodes = NULL;
-    (void)userptr;
-}
 
-struct swlist *swlist_create(struct dict *dict)
+struct swlist *swlist_create(void)
 {
-    hashtable_foreach(dict->words, reset_word_subnodes, NULL, NULL);
-
     struct swlist *wl = xmalloc(sizeof *wl);
     *wl = (struct swlist){
         .alloc = fixed_allocator_create(sizeof (struct swnode), 256)

@@ -7,16 +7,15 @@ struct lattice;
 
 
 struct alnode {
-    unsigned refcount;
     bool ispath;
+    unsigned minscore, maxscore; // same for path nodes
+    unsigned refcount;
 
     union {
         struct {
-            unsigned minscore, maxscore;
             struct alnode *left, *right; // left may be null
         };
         struct {
-            unsigned score;
             timestamp_t time;
             struct swnode *swnode;
             struct alnode *pred; // path node, or null for beginning of path
