@@ -38,7 +38,7 @@ static void delete(struct alnode *node, struct alignment *al)
     pool_free(node, al->alloc);
 }
 
-
+/*
 static struct alnode *make_tree(struct alnode *left, struct alnode *right,
         struct alignment *al)
 {
@@ -51,102 +51,148 @@ static struct alnode *make_tree(struct alnode *left, struct alnode *right,
         .right = ref(right)
     };
     return node;
+}*/
+
+static struct alnode *make_tree_haverefs(struct alnode *left, struct alnode *right,
+        struct alignment *al)
+{
+    struct alnode *node = pool_alloc(al->alloc);
+    *node = (struct alnode) {
+        .minscore = left ? left->minscore : 0,
+        .maxscore = right->maxscore,
+        .refcount = 1,
+        .left = left,
+        .right = right
+    };
+    return node;
 }
 
 
-static void merge_path_complete(struct alnode **dest,
+
+static struct alnode *merge_path_complete(struct alnode *into,
         struct alnode *path, struct alignment *al)
 {
-    if ((*dest)->ispath) {
-        if (path->minscore > (*dest)->minscore) {
-            unref(*dest, al);
-            *dest = ref(path);
-        }
+    if (into->ispath) {
+        if (path->minscore > into->minscore)
+            return ref(path);
+        else
+            return NULL;
     }
-    else if (path->minscore >= (*dest)->maxscore) {
-        unref(*dest, al);
-        *dest = ref(path);
+    else if (path->minscore >= into->maxscore) {
+        return ref(path);
     }
-    else if (path->minscore > (*dest)->minscore) {
-        struct alnode *left = ref((*dest)->left);
-        struct alnode *right = ref((*dest)->right);
+    else if (path->minscore > into->minscore) {
+        struct alnode *newleft = merge_path_complete(into->left, path, al);
+        struct alnode *newright = merge_path_complete(into->right, path, al);
+
+        return make_tree_haverefs(
+                newleft ? newleft : ref(into->left),
+                newright ? newright : ref(into->right), al);
+    }
+    else return NULL;
+}
+
+static inline void replace(struct alnode **dest,
+        struct alnode *optref, struct alignment *al)
+{
+    if (optref) {
         unref(*dest, al);
-
-        merge_path_complete(&left, path, al);
-        merge_path_complete(&right, path, al);
-        *dest = make_tree(left, right, al);
-
-        unref(left, al);
-        unref(right, al);
+        *dest = optref;
     }
 }
 
-static void merge_path_partial(struct alnode **dest, unsigned width,
+
+static struct alnode *merge_pathes(struct alnode *into, unsigned width,
+        struct alnode *path, unsigned pos, struct alignment *al)
+{
+    assert(into->ispath && path->ispath &&
+            pos > 0 && pos < width && into->minscore < path->minscore);
+
+    unsigned splitpos = width / 2;
+
+    struct alnode *left = pos < splitpos ?
+            merge_pathes(into, splitpos, path, pos, al) :
+            ref(into);
+
+    struct alnode *right = pos > splitpos ?
+            merge_pathes(into, splitpos, path, pos - splitpos, al) :
+            ref(path);
+
+    return make_tree_haverefs(left, right, al);
+}
+
+static struct alnode *merge_path_partial(struct alnode *into, unsigned width,
         struct alnode *path, unsigned pos, struct alignment *al)
 {
     assert(pos < width);
     if (pos == 0) {
-        merge_path_complete(dest, path, al);
+        return merge_path_complete(into, path, al);
     }
-    else if (path->minscore > (*dest)->minscore) {
-        struct alnode *left, *right;
-        if ((*dest)->ispath) {
-            left = ref(*dest);
-            right = ref(*dest);
-        } else {
-            left = ref((*dest)->left);
-            right = ref((*dest)->right);
+    else if (path->minscore > into->minscore) {
+        if (into->ispath) {
+            return merge_pathes(into, width, path, pos, al);
         }
-        unref(*dest, al);
+        else {
+            unsigned splitpos = width / 2;
 
-        unsigned splitpos = width / 2;
-        if (pos < splitpos) {
-            merge_path_partial(&left, splitpos, path, pos, al);
-            merge_path_complete(&right, path, al);
-        } else {
-            merge_path_partial(&right, splitpos, path, pos - splitpos, al);
+            struct alnode *newleft = pos < splitpos ?
+                    merge_path_partial(into->left, splitpos, path, pos, al) :
+                    NULL;
+
+            struct alnode *newright = path->minscore > into->right->minscore ?
+                    pos > splitpos ?
+                            merge_path_partial(into->right, splitpos, path,
+                                    pos - splitpos, al) :
+                            merge_path_complete(into->right, path, al) :
+                    NULL;
+
+            if (newleft || newright)
+                return make_tree_haverefs(
+                        newleft ? newleft : ref(into->left),
+                        newright ? newright : ref(into->right), al);
+            else
+                return NULL;
         }
-        *dest = make_tree(left, right, al);
-        unref(left, al);
-        unref(right, al);
     }
+    else return NULL;
 }
 
 
 
-static void merge_tree(struct alnode **dest,
+static struct alnode *merge_tree(struct alnode *into,
         struct alnode *tree, struct alignment *al)
 {
-    if (*dest == tree) {}
-    else if (tree->maxscore <= (*dest)->minscore) {}
-    else if (tree->minscore >= (*dest)->maxscore) {
-        unref(*dest, al);
-        *dest = ref(tree);
+    if (tree->minscore >= into->maxscore) {
+        return ref(tree);
     }
     else if (tree->ispath) {
-        merge_path_complete(dest, tree, al);
+        return merge_path_complete(into, tree, al);
     }
-    else if ((*dest)->ispath) {
-        struct alnode *new = ref(tree);
-        merge_path_complete(&new, *dest, al);
-        unref(*dest, al);
-        *dest = new;
+    else if (into->ispath) {
+        struct alnode *new = merge_path_complete(tree, into, al);
+        if (!new) { return ref(tree); }
+        else if (new == into) { unref(new, al); return NULL; }
+        else { return new; }
     }
-    else if ((*dest)->left == tree->left && (*dest)->right == tree->right) {}
     else {
-        struct alnode *left = ref((*dest)->left);
-        struct alnode *right = ref((*dest)->right);
+        struct alnode *newleft, *newright;
 
-        merge_tree(&left, tree->left, al);
-        merge_tree(&right, tree->right, al);
+        if (tree->left != into->left && tree->left->maxscore > into->left->minscore)
+            newleft = merge_tree(into->left, tree->left, al);
+        else
+            newleft = NULL;
 
-        if ((*dest)->left != left || (*dest)->right != right) {
-            unref(*dest, al);
-            *dest = make_tree(left, right, al);
-        }
+        if (tree->right != into->right && tree->right->maxscore > into->right->minscore)
+            newright = merge_tree(into->right, tree->right, al);
+        else
+            newright = NULL;
 
-        unref(left, al);
-        unref(right, al);
+        if (newleft || newright)
+            return make_tree_haverefs(
+                    newleft ? newleft : ref(into->left),
+                    newright ? newright : ref(into->right), al);
+        else
+            return NULL;
     }
 }
 
@@ -252,14 +298,16 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
         ready = node->ready_next;
 
         if (!node->exits_head) {
-            merge_tree(&al->pathes, node->pathes, al);
+            struct alnode *new = merge_tree(al->pathes, node->pathes, al);
+            if (new) { unref(al->pathes, al); al->pathes = new; }
         }
         else {
             // todo: audio scores!
 
             FOREACH(struct latlink, link, node->exits_head, exits_next) {
                 struct latnode *dest = link->to;
-                merge_tree(&dest->pathes, node->pathes, al);
+                struct alnode *new = merge_tree(dest->pathes, node->pathes, al);
+                if (new) { unref(dest->pathes, al); dest->pathes = new; }
 
                 if (--dest->nentries_remain == 0)
                     dest->ready_next = ready, ready = dest;
@@ -299,8 +347,9 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
                         }
 
                         struct latnode *dest = link->to;
-                        merge_path_partial(&dest->pathes, al->width,
-                                newpath, swnode->position, al);
+                        replace(&dest->pathes,
+                                merge_path_partial(dest->pathes, al->width,
+                                        newpath, swnode->position, al), al);
 
                         if (newpath->refcount > 1) { // has been stored in tree
                             newpath = NULL;
