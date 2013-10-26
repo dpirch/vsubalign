@@ -6,6 +6,13 @@ struct swlist;
 struct lattice;
 
 
+struct alpathnode {
+    unsigned refcount;
+    timestamp_t time;
+    struct swnode *swnode;
+    struct alpathnode *pred; // null for beginning of path
+};
+
 struct alnode {
     bool ispath;
     unsigned minscore, maxscore; // same for path nodes
@@ -13,12 +20,10 @@ struct alnode {
 
     union {
         struct {
-            struct alnode *left, *right; // left may be null
+            struct alnode *left, *right;
         };
         struct {
-            timestamp_t time;
-            struct swnode *swnode;
-            struct alnode *pred; // path node, or null for beginning of path
+            struct alpathnode *tail; // null for empty path
         };
     };
 };
@@ -26,7 +31,9 @@ struct alnode {
 
 struct alignment {
     struct pool_allocator *alloc;
+    struct pool_allocator *pnalloc;
     struct alnode *pathes;
+    struct alnode *empty;
     unsigned width;
 };
 

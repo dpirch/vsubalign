@@ -7,10 +7,9 @@
 
 static unsigned cc[10] = {0};
 
-
 static inline struct alnode *ref(struct alnode *node)
 {
-    if (node) node->refcount++;
+    node->refcount++;
     return node;
 }
 
@@ -18,28 +17,26 @@ static void delete(struct alnode *node, struct alignment *al);
 
 static inline void unref(struct alnode *node, struct alignment *al)
 {
-    if (node && --node->refcount == 0)
+    if (--node->refcount == 0)
         delete(node, al);
 }
 
 static void delete(struct alnode *node, struct alignment *al)
 {
     if (node->ispath) {
-        do {
-            struct alnode *pred = node->pred;
-            pool_free(node, al->alloc);
-            node = pred;
-        } while (node && --node->refcount == 0);
+        struct alpathnode *pn = node->tail;
+        while (pn && --pn->refcount == 0) {
+            struct alpathnode *pred = pn->pred;
+            pool_free(node, al->pnalloc);
+            pn = pred;
+        }
     }
     else {
         unref(node->left, al);
         unref(node->right, al);
-        pool_free(node, al->alloc);
     }
+    pool_free(node, al->alloc);
 }
-
-
-
 
 
 static struct alnode *make_tree(struct alnode *left, struct alnode *right,
@@ -57,33 +54,10 @@ static struct alnode *make_tree(struct alnode *left, struct alnode *right,
 }
 
 
-static struct alnode *make_path(struct alnode *base,
-        struct swnode *swnode, timestamp_t time, struct alignment *al)
-{
-    // todo
-    unsigned score = base ? base->minscore + 1 : 1;
-
-    struct alnode *path = pool_alloc(al->alloc);
-    *path = (struct alnode) {
-        .ispath = true,
-        .minscore = score,
-        .maxscore = score,
-        .refcount = 1,
-        .time = time,
-        .swnode = swnode,
-        .pred = ref(base)
-    };
-    return path;
-}
-
-
 static void merge_path_complete(struct alnode **dest,
         struct alnode *path, struct alignment *al)
 {
-    if (!*dest) {
-        *dest = ref(path);
-    }
-    else if ((*dest)->ispath) {
+    if ((*dest)->ispath) {
         if (path->minscore > (*dest)->minscore) {
             unref(*dest, al);
             *dest = ref(path);
@@ -114,11 +88,9 @@ static void merge_path_partial(struct alnode **dest, unsigned width,
     if (pos == 0) {
         merge_path_complete(dest, path, al);
     }
-    else if (!*dest || path->minscore > (*dest)->minscore) {
+    else if (path->minscore > (*dest)->minscore) {
         struct alnode *left, *right;
-        if (!*dest) {
-            left = right = NULL;
-        } else if ((*dest)->ispath) {
+        if ((*dest)->ispath) {
             left = ref(*dest);
             right = ref(*dest);
         } else {
@@ -145,8 +117,7 @@ static void merge_path_partial(struct alnode **dest, unsigned width,
 static void merge_tree(struct alnode **dest,
         struct alnode *tree, struct alignment *al)
 {
-    if (*dest == tree || !tree) {}
-    else if (!*dest) { *dest = ref(tree); }
+    if (*dest == tree) {}
     else if (tree->maxscore <= (*dest)->minscore) {}
     else if (tree->minscore >= (*dest)->maxscore) {
         unref(*dest, al);
@@ -165,16 +136,14 @@ static void merge_tree(struct alnode **dest,
     else {
         struct alnode *left = ref((*dest)->left);
         struct alnode *right = ref((*dest)->right);
-        unref(*dest, al);
-
-        if (left == tree->left) cc[0]++;
-        if (right == tree->right) cc[1]++;
-        if (left == tree->left && right == tree->right) cc[2]++;
-        if (left != tree->left && right != tree->right) cc[3]++;
 
         merge_tree(&left, tree->left, al);
         merge_tree(&right, tree->right, al);
-        *dest = make_tree(left, right, al);
+
+        if ((*dest)->left != left || (*dest)->right != right) {
+            unref(*dest, al);
+            *dest = make_tree(left, right, al);
+        }
 
         unref(left, al);
         unref(right, al);
@@ -201,11 +170,23 @@ struct alignment *alignment_create(struct swlist *swl)
     struct alignment *al = xmalloc(sizeof *al);
     *al = (struct alignment) {
         .alloc = pool_allocator_create(sizeof (struct alnode), 256),
+        .pnalloc = pool_allocator_create(sizeof (struct alpathnode), 256)
     };
 
     al->width = 1;
     while (al->width < swl->length)
         al->width *= 2;
+
+    al->empty = pool_alloc(al->alloc);
+    *al->empty = (struct alnode) {
+        .ispath = true,
+        .minscore = 0,
+        .maxscore = 0,
+        .refcount = 1,
+        .tail = NULL
+    };
+
+    al->pathes = ref(al->empty);
 
     return al;
 }
@@ -213,8 +194,10 @@ struct alignment *alignment_create(struct swlist *swl)
 void alignment_delete(struct alignment *al)
 {
     unref(al->pathes, al);
+    unref(al->empty, al);
 
     pool_allocator_delete(al->alloc);
+    pool_allocator_delete(al->pnalloc);
     free(al);
 }
 
@@ -249,18 +232,19 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
 
     // init ready list and init pathes for these nodes
     FOREACH(struct latnode, node, lat->nodelist, next) {
-        node->pathes = NULL;
         node->nentries_remain = node->nentries;
         if (node->nentries_remain == 0) {
             node->ready_next = ready;
             ready = node;
             node->pathes = ref(al->pathes);
+        } else {
+            node->pathes = ref(al->empty);
         }
     }
 
     // reset al->pathes, will be used to store pathes at end of segment
     unref(al->pathes, al);
-    al->pathes = NULL;
+    al->pathes = ref(al->empty);
 
     // traverse lattice
     while (ready) {
@@ -288,16 +272,46 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
                         base = tree_lookup(
                                 node->pathes, al->width, swnode->position - 1);
 
-                    struct alnode *newpath = make_path(
-                            base, swnode, node->time, al);
+                    struct alpathnode *tail = pool_alloc(al->pnalloc);
+                    *tail = (struct alpathnode) {
+                        .refcount = 0,
+                        .time = node->time,
+                        .swnode = swnode,
+                        .pred = base ? base->tail : NULL };
+
+                    // tree node to reuse until it is actually stored in a tree
+                    struct alnode *newpath = NULL;
 
                     FOREACH(struct latlink, link, node->exits_head, exits_next) {
+
+                        // todo
+                        unsigned score = base ? base->minscore + 1 : 1;
+
+                        if (!newpath) {
+                            newpath = pool_alloc(al->alloc);
+                            *newpath = (struct alnode) {
+                                .ispath = true,
+                                .minscore = score, .maxscore = score,
+                                .refcount = 1,
+                                .tail = tail };
+                        } else {
+                            newpath->minscore = newpath->maxscore = score;
+                        }
+
                         struct latnode *dest = link->to;
                         merge_path_partial(&dest->pathes, al->width,
                                 newpath, swnode->position, al);
 
+                        if (newpath->refcount > 1) { // has been stored in tree
+                            newpath = NULL;
+                            tail->refcount++;
+                        }
                     }
-                    unref(newpath, al);
+                    // todo measure
+                    if (newpath) pool_free(newpath, al->alloc);
+
+                    if (tail->refcount == 0) pool_free(tail, al->pnalloc);
+                    else if (tail->pred) tail->pred->refcount++;
                 }
             }
         }
@@ -311,13 +325,16 @@ void alignment_add_lattice(struct alignment *al, struct lattice *lat)
 void alignment_dump_final(const struct alignment *al)
 {
     struct alnode *path = tree_lookup(al->pathes, al->width, al->width - 1);
-    while (path) {
-        printf("%u:%02u.%02u: %s (%.2f)\n",
-                path->time / 60000, path->time / 1000 % 60, path->time / 10 % 100,
-                path->swnode->word->string,
-                ((double)path->time - path->swnode->minstarttime) / ((double)path->swnode->maxendtime - path->swnode->minstarttime));
+    if (path) {
+        struct alpathnode *pn = path->tail;
+        while (pn) {
+            printf("%u:%02u.%02u: %s (%.2f)\n",
+                    pn->time / 60000, pn->time / 1000 % 60, pn->time / 10 % 100,
+                    pn->swnode->word->string,
+                    ((double)pn->time - pn->swnode->minstarttime) / ((double)pn->swnode->maxendtime - pn->swnode->minstarttime));
 
-        path = path->pred;
+            pn = pn->pred;
+        }
     }
 
     for (unsigned i = 0; i < sizeof cc / sizeof *cc; i++)
