@@ -62,18 +62,17 @@ bool aqueue_push(struct aqueue *q, void *item, unsigned pos)
 void *aqueue_pop(struct aqueue *q, unsigned *pos)
 {
     CHECK(!pthread_mutex_lock(&q->mutex));
-    if (pos) *pos = q->pos;
-    void **slot = q->buffer + q->offset;
 
-    while (!q->closed && !*slot)
+    while (!q->closed && !q->buffer[q->offset])
         CHECK(!pthread_cond_wait(&q->popwait, &q->mutex));
 
-    void *item = *slot;
+    void *item = q->buffer[q->offset];
     if (item) {
-        *slot = NULL;
-        q->pos++;
+        q->buffer[q->offset] = NULL;
         q->offset++;
         if (q->offset == q->length) q->offset = 0;
+        if (pos) *pos = q->pos;
+        q->pos++;
         CHECK(!pthread_cond_broadcast(&q->pushwait));
     }
 
